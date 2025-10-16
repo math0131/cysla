@@ -1,134 +1,79 @@
-<!doctype html>
-<html lang="pt-br">
+<!DOCTYPE html>
+<html lang="pt-BR">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Cysla</title>
-<style>
-  :root { --bg: #0b0f14; --ink:#e8f0ff; }
-  html, body { height:100%; margin:0; background:var(--bg); color:var(--ink); overflow:hidden;
-    font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
-  canvas { position:fixed; inset:0; width:100%; height:100%; display:block; }
-  .center { position:fixed; inset:0; display:grid; place-items:center; pointer-events:none;
-    text-transform: lowercase; letter-spacing:.12em; font-weight:600; padding:2rem; }
-  .center span { font-size:clamp(1.2rem,3vw + 1rem,3rem); opacity:.95; text-shadow:0 2px 8px rgba(232,240,255,.18);
-    animation:pulse 2s ease-in-out infinite; }
-  @keyframes pulse { 0%,100%{ transform:translateY(0); opacity:.95 } 50%{ transform:translateY(-2px); opacity:1 } }
-  @media (prefers-reduced-motion: reduce){ .center span{ animation:none } }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cysla — Em breve</title>
+  <style>
+    /* Reset e estilo básico */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: "Poppins", sans-serif;
+    }
+
+    body {
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+      color: #fff;
+      text-align: center;
+    }
+
+    .container {
+      max-width: 600px;
+      padding: 2rem;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 16px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      letter-spacing: 1px;
+      margin-bottom: 1rem;
+    }
+
+    p {
+      font-size: 1.1rem;
+      color: #ddd;
+      margin-bottom: 2rem;
+    }
+
+    .email {
+      display: inline-block;
+      margin-top: 1rem;
+      padding: 0.8rem 1.5rem;
+      border: 1px solid #00bcd4;
+      border-radius: 8px;
+      color: #00bcd4;
+      text-decoration: none;
+      transition: 0.3s;
+    }
+
+    .email:hover {
+      background: #00bcd4;
+      color: #fff;
+    }
+
+    footer {
+      margin-top: 2rem;
+      font-size: 0.9rem;
+      color: #aaa;
+    }
+  </style>
 </head>
 <body>
-  <canvas id="gl"></canvas>
-  <div class="center"><span>aguarde</span></div>
-
-<script>
-(function(){
-  const canvas = document.getElementById('gl');
-  const DPR = Math.max(1, Math.min(2, window.devicePixelRatio||1));
-
-  // WebGL sem alpha para evitar costuras/banding do compositor
-  const gl = canvas.getContext('webgl', { alpha:false, antialias:false, depth:false, stencil:false, preserveDrawingBuffer:false });
-  if(!gl){ document.body.style.background='#0b0f14'; return; }
-
-  function fit(){
-    const w = Math.floor(innerWidth), h = Math.floor(innerHeight);
-    canvas.width  = Math.max(1, Math.floor(w * DPR));
-    canvas.height = Math.max(1, Math.floor(h * DPR));
-    canvas.style.width = w+'px'; canvas.style.height = h+'px';
-    gl.viewport(0,0,canvas.width,canvas.height);
-  }
-  addEventListener('resize', fit, {passive:true}); fit();
-
-  const vert = `
-    attribute vec2 aPos;
-    varying vec2 vUv;
-    void main(){
-      vUv = (aPos + 1.0)*0.5;
-      gl_Position = vec4(aPos, 0.0, 1.0);
-    }`;
-  const frag = `
-    precision highp float;
-    varying vec2 vUv;
-    uniform vec2 uRes;
-    uniform float uTime;
-
-    // hash & noise (baratos e sem textura externa)
-    float hash(vec2 p){ return fract(sin(dot(p, vec2(41.0, 289.0))) * 43758.5453123); }
-    float noise(vec2 p){
-      vec2 i = floor(p), f = fract(p);
-      float a = hash(i), b = hash(i+vec2(1.0,0.0));
-      float c = hash(i+vec2(0.0,1.0)), d = hash(i+vec2(1.0,1.0));
-      vec2 u = f*f*(3.0-2.0*f);
-      return mix(mix(a,b,u.x), mix(c,d,u.x), u.y);
-    }
-    float fbm(vec2 p){
-      float v=0.0, amp=0.5;
-      for(int i=0;i<5;i++){
-        v += amp*noise(p); p*=2.02; amp*=0.5;
-      }
-      return v;
-    }
-
-    void main(){
-      // coords estáveis, sem subpixel: base em px inteiros
-      vec2 px = floor(vUv * uRes) / uRes;
-      vec2 uv = px * vec2(uRes.x/uRes.y, 1.0);
-
-      // campo animado (sem blends)
-      float t = uTime*0.07;
-      float n1 = fbm(uv*2.0 + vec2(t, -t));
-      float n2 = fbm(uv*3.7 + vec2(-t*0.7, t*0.5));
-      float n = smoothstep(0.2, 0.8, mix(n1, n2, 0.5));
-
-      // paleta (azul → ciano) – tudo opaco
-      vec3 a = vec3(0.06, 0.23, 0.42);
-      vec3 b = vec3(0.36, 0.71, 1.00);
-      vec3 col = mix(a, b, n);
-
-      gl_FragColor = vec4(col, 1.0); // 100% opaco
-    }`;
-
-  function compile(type, src){
-    const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
-    if(!gl.getShaderParameter(s, gl.COMPILE_STATUS)){ console.error(gl.getShaderInfoLog(s)); }
-    return s;
-  }
-  const prog = gl.createProgram();
-  gl.attachShader(prog, compile(gl.VERTEX_SHADER, vert));
-  gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, frag));
-  gl.linkProgram(prog);
-  gl.useProgram(prog);
-
-  const quad = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, quad);
-  // full-screen quad (2 triângulos) – sem linhas
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-    -1,-1,  1,-1, -1, 1,
-     1,-1,  1, 1, -1, 1
-  ]), gl.STATIC_DRAW);
-
-  const aPos = gl.getAttribLocation(prog, 'aPos');
-  gl.enableVertexAttribArray(aPos);
-  gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
-
-  const uRes  = gl.getUniformLocation(prog, 'uRes');
-  const uTime = gl.getUniformLocation(prog, 'uTime');
-
-  let t0 = performance.now();
-  function frame(now){
-    const t = (now - t0) / 1000.0;
-    gl.uniform2f(uRes, canvas.width, canvas.height);
-    gl.uniform1f(uTime, t);
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
-    requestAnimationFrame(frame);
-  }
-  requestAnimationFrame(frame);
-
-  // pausa em background
-  document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) t0 = performance.now();
-  });
-})();
-</script>
+  <div class="container">
+    <h1>Cysla</h1>
+    <p>Estamos preparando algo incrível para você.<br>
+    Em breve estaremos no ar!</p>
+    <a href="mailto:contato@cysla.com" class="email">Entre em contato</a>
+    <footer>© 2025 Cysla. Todos os direitos reservados.</footer>
+  </div>
 </body>
 </html>
