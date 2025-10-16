@@ -1,116 +1,134 @@
 <!doctype html>
 <html lang="pt-br">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Cysla</title>
-  <style>
-    :root {
-      --bg: #0b0f14;   /* fundo */
-      --ink: #e8f0ff;  /* texto */
-    }
-    html, body {
-      height: 100%;
-      margin: 0;
-      background: var(--bg);
-      color: var(--ink);
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif;
-      overflow: hidden;
-    }
-    /* SVG em tela cheia */
-    .stage {
-      position: fixed;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      display: block;
-      /* força composição estável sem subpixel */
-      backface-visibility: hidden;
-      transform: translateZ(0);
-    }
-    /* Texto central */
-    .center {
-      position: fixed;
-      inset: 0;
-      display: grid;
-      place-items: center;
-      pointer-events: none;
-      text-transform: lowercase;
-      letter-spacing: 0.12em;
-      font-weight: 600;
-      text-align: center;
-      padding: 2rem;
-      mix-blend-mode: lighten; /* fica visível em qualquer cor por baixo */
-    }
-    .center span {
-      font-size: clamp(1.2rem, 3vw + 1rem, 3rem);
-      opacity: 0.95;
-      text-shadow: 0 2px 8px rgba(232,240,255,0.18);
-      animation: pulse 2s ease-in-out infinite;
-    }
-    @keyframes pulse {
-      0%, 100% { transform: translateY(0); opacity: 0.95; }
-      50%      { transform: translateY(-2px); opacity: 1; }
-    }
-    /* Respeita prefers-reduced-motion */
-    @media (prefers-reduced-motion: reduce) {
-      .center span { animation: none; }
-      /* Pausa a animação do ruído (ver <animate> com media query) */
-      svg .motion { display: none; }
-    }
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Cysla</title>
+<style>
+  :root { --bg: #0b0f14; --ink:#e8f0ff; }
+  html, body { height:100%; margin:0; background:var(--bg); color:var(--ink); overflow:hidden;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+  canvas { position:fixed; inset:0; width:100%; height:100%; display:block; }
+  .center { position:fixed; inset:0; display:grid; place-items:center; pointer-events:none;
+    text-transform: lowercase; letter-spacing:.12em; font-weight:600; padding:2rem; }
+  .center span { font-size:clamp(1.2rem,3vw + 1rem,3rem); opacity:.95; text-shadow:0 2px 8px rgba(232,240,255,.18);
+    animation:pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{ transform:translateY(0); opacity:.95 } 50%{ transform:translateY(-2px); opacity:1 } }
+  @media (prefers-reduced-motion: reduce){ .center span{ animation:none } }
+</style>
 </head>
 <body>
-  <!--
-    Animação generativa sem traços:
-    - Um gradiente grande é distorcido por feTurbulence + feDisplacementMap.
-    - A turbulência tem duas camadas (fractalNoise) e é animada no tempo.
-    - Nenhuma linha é desenhada, então não há hairlines.
-  -->
-  <svg class="stage" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-    <defs>
-      <!-- Paleta suave em gradiente -->
-      <linearGradient id="grad" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0%"  stop-color="#0e3a6b"/>
-        <stop offset="50%" stop-color="#245a9b"/>
-        <stop offset="100%" stop-color="#5bd0ff"/>
-      </linearGradient>
-
-      <!-- Filtro de ruído orgânico -->
-      <filter id="organic" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">
-        <!-- Camada base: fractalNoise grande (ondas largas) -->
-        <feTurbulence type="fractalNoise" baseFrequency="0.003 0.006" numOctaves="3" seed="7" result="noise1">
-          <!-- Anima o ruído no tempo (sem subpixel/linhas) -->
-          <animate class="motion" attributeName="seed" values="7;8;9;10;11;12;7" dur="14s" repeatCount="indefinite"/>
-        </feTurbulence>
-
-        <!-- Camada extra: detalhes finos que se movem devagar -->
-        <feTurbulence type="fractalNoise" baseFrequency="0.02 0.015" numOctaves="2" seed="13" result="noise2">
-          <animate class="motion" attributeName="seed" values="13;14;15;16;13" dur="20s" repeatCount="indefinite"/>
-        </feTurbulence>
-
-        <!-- Mistura as camadas -->
-        <feBlend mode="multiply" in="noise1" in2="noise2" result="noise"/>
-
-        <!-- Desloca o gradiente pela textura do ruído -->
-        <feDisplacementMap in="SourceGraphic" in2="noise" scale="20" xChannelSelector="R" yChannelSelector="G" result="disp"/>
-
-        <!-- Suaviza e dá brilho leve -->
-        <feColorMatrix in="disp" type="matrix"
-          values="
-            1 0 0 0 0
-            0 1 0 0 0
-            0 0 1 0 0
-            0 0 0 0.97 0" result="soft"/>
-        <feGaussianBlur in="soft" stdDeviation="0.15" edgeMode="duplicate"/>
-      </filter>
-    </defs>
-
-    <!-- Retângulo que cobre a tela com gradiente e filtro -->
-    <rect x="-20" y="-20" width="140" height="140" fill="url(#grad)" filter="url(#organic)"/>
-  </svg>
-
+  <canvas id="gl"></canvas>
   <div class="center"><span>aguarde</span></div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('gl');
+  const DPR = Math.max(1, Math.min(2, window.devicePixelRatio||1));
+
+  // WebGL sem alpha para evitar costuras/banding do compositor
+  const gl = canvas.getContext('webgl', { alpha:false, antialias:false, depth:false, stencil:false, preserveDrawingBuffer:false });
+  if(!gl){ document.body.style.background='#0b0f14'; return; }
+
+  function fit(){
+    const w = Math.floor(innerWidth), h = Math.floor(innerHeight);
+    canvas.width  = Math.max(1, Math.floor(w * DPR));
+    canvas.height = Math.max(1, Math.floor(h * DPR));
+    canvas.style.width = w+'px'; canvas.style.height = h+'px';
+    gl.viewport(0,0,canvas.width,canvas.height);
+  }
+  addEventListener('resize', fit, {passive:true}); fit();
+
+  const vert = `
+    attribute vec2 aPos;
+    varying vec2 vUv;
+    void main(){
+      vUv = (aPos + 1.0)*0.5;
+      gl_Position = vec4(aPos, 0.0, 1.0);
+    }`;
+  const frag = `
+    precision highp float;
+    varying vec2 vUv;
+    uniform vec2 uRes;
+    uniform float uTime;
+
+    // hash & noise (baratos e sem textura externa)
+    float hash(vec2 p){ return fract(sin(dot(p, vec2(41.0, 289.0))) * 43758.5453123); }
+    float noise(vec2 p){
+      vec2 i = floor(p), f = fract(p);
+      float a = hash(i), b = hash(i+vec2(1.0,0.0));
+      float c = hash(i+vec2(0.0,1.0)), d = hash(i+vec2(1.0,1.0));
+      vec2 u = f*f*(3.0-2.0*f);
+      return mix(mix(a,b,u.x), mix(c,d,u.x), u.y);
+    }
+    float fbm(vec2 p){
+      float v=0.0, amp=0.5;
+      for(int i=0;i<5;i++){
+        v += amp*noise(p); p*=2.02; amp*=0.5;
+      }
+      return v;
+    }
+
+    void main(){
+      // coords estáveis, sem subpixel: base em px inteiros
+      vec2 px = floor(vUv * uRes) / uRes;
+      vec2 uv = px * vec2(uRes.x/uRes.y, 1.0);
+
+      // campo animado (sem blends)
+      float t = uTime*0.07;
+      float n1 = fbm(uv*2.0 + vec2(t, -t));
+      float n2 = fbm(uv*3.7 + vec2(-t*0.7, t*0.5));
+      float n = smoothstep(0.2, 0.8, mix(n1, n2, 0.5));
+
+      // paleta (azul → ciano) – tudo opaco
+      vec3 a = vec3(0.06, 0.23, 0.42);
+      vec3 b = vec3(0.36, 0.71, 1.00);
+      vec3 col = mix(a, b, n);
+
+      gl_FragColor = vec4(col, 1.0); // 100% opaco
+    }`;
+
+  function compile(type, src){
+    const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+    if(!gl.getShaderParameter(s, gl.COMPILE_STATUS)){ console.error(gl.getShaderInfoLog(s)); }
+    return s;
+  }
+  const prog = gl.createProgram();
+  gl.attachShader(prog, compile(gl.VERTEX_SHADER, vert));
+  gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, frag));
+  gl.linkProgram(prog);
+  gl.useProgram(prog);
+
+  const quad = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+  // full-screen quad (2 triângulos) – sem linhas
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+    -1,-1,  1,-1, -1, 1,
+     1,-1,  1, 1, -1, 1
+  ]), gl.STATIC_DRAW);
+
+  const aPos = gl.getAttribLocation(prog, 'aPos');
+  gl.enableVertexAttribArray(aPos);
+  gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+  const uRes  = gl.getUniformLocation(prog, 'uRes');
+  const uTime = gl.getUniformLocation(prog, 'uTime');
+
+  let t0 = performance.now();
+  function frame(now){
+    const t = (now - t0) / 1000.0;
+    gl.uniform2f(uRes, canvas.width, canvas.height);
+    gl.uniform1f(uTime, t);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  // pausa em background
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) t0 = performance.now();
+  });
+})();
+</script>
 </body>
 </html>
-
