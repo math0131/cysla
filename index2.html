@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Aguarde — Animação Generativa</title>
+  <style>
+    :root {
+      --bg: #0b0f14;
+      --ink: #d5e1ff;
+      --veil: rgba(11, 15, 20, 0.06);
+    }
+
+    /* Layout base: tela cheia */
+    html, body {
+      height: 100%;
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif;
+      overflow: hidden;
+    }
+
+    /* Canvas ocupa a tela toda (fica por baixo do texto) */
+    canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Texto “aguarde” centralizado e com leve animação */
+    .center {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      pointer-events: none;
+      text-transform: lowercase;
+      letter-spacing: 0.12em;
+      font-weight: 600;
+      text-align: center;
+      padding: 2rem;
+    }
+
+    .center span {
+      font-size: clamp(1.2rem, 3vw + 1rem, 3rem);
+      opacity: 0.92;
+      animation: pulse 2s ease-in-out infinite;
+      filter: drop-shadow(0 2px 8px rgba(213,225,255,0.18));
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: translateY(0); opacity: 0.92; }
+      50%      { transform: translateY(-2px); opacity: 1; }
+    }
+
+    /* Acessibilidade: respeitar usuários que preferem reduzir movimento */
+    @media (prefers-reduced-motion: reduce) {
+      .center span { animation: none; }
+    }
+
+    /* Sutileza extra: bordas escuras (vinheta) para dar profundidade */
+    .vignette {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(120% 80% at 50% 50%, rgba(0,0,0,0) 60%, rgba(0,0,0,0.35) 100%);
+      mix-blend-mode: multiply;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div class="center"><span>aguarde</span></div>
+  <div class="vignette" aria-hidden="true"></div>
+
+  <script>
+    // Animação generativa: partículas seguindo um "campo de fluxo".
+    // Sem bibliotecas externas. Desenha trilhas suaves e vivas.
+
+    const canvas = document.getElementById('c');
+    const ctx = canvas.getContext('2d', { alpha: true });
+
+    // Ajusta para DPI alto
+    const DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+
+    let W = 0, H = 0, running = true;
+
+    function resize() {
+      W = canvas.width  = Math.floor(innerWidth  * DPR);
+      H = canvas.height = Math.floor(innerHeight * DPR);
+      canvas.style.width  = innerWidth  + 'px';
+      canvas.style.height = innerHeight + 'px';
+      // Preenche fundo transparente; o CSS dá a cor de fundo
+      ctx.clearRect(0, 0, W, H);
+    }
+    addEventListener('resize', resize, { passive: true });
+    resize();
+
+    // Preferência do usuário por reduzir movimento
+    const prefersReducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+    function updateMotionPreference() {
+      running = !prefersReducedMotion.matches;
+    }
+    prefersReducedMotion.addEventListener?.('change', updateMotionPreference);
+    updateMotionPreference();
+
+    // Parâmetros do campo/partículas
+    const PARTICLES = 1200;            // quantidade de partículas
+    const SPEED = 0.7;                 // velocidade base
+    const TRAIL_FADE = 0.06;           // desvanecimento do rastro
+    const SCALE = 0.0018;              // escala espacial do campo
+    const CURL = 0.35;                 // mistura seno/cosseno para variação
+    const TURN = 0.018;                // fator de rotação pelo campo
+    const JITTER = 0.12;               // ruído aleatório pequeno no rumo
+    const COLORS = [
+      // tons frios discretos
+      '#a9b8ff', '#9ad0ff', '#c3f0ff', '#8cc2ff'
+    ];
+
+    // Gera um pool fixo de partículas
+    const particles = [];
+    const rand = (min, max) => Math.random() * (max - min) + min;
+
+    function spawn(i) {
+      // Distribui radialmente, privilegiando o centro
+      const r = Math.sqrt(Math.random()) * Math.hypot(W, H) * 0.4;
+      const a = Math.random() * Math.PI * 2;
+      const x = W/2 + Math.cos(a) * r;
+      const y = H/2 + Math.sin(a) * r;
+      particles[i] = {
+        x, y,
+        vx: rand(-1,1),
+        vy: rand(-1,1),
+        life: 0,
+        hue: COLORS[(Math.random() * COLORS.length) | 0]
+      };
+    }
+
+    for (let i = 0; i < PARTICLES; i++) spawn(i);
+
+    // Função de "ruído" barata baseada em seno/cosseno acoplados ao tempo
+    function flowAngle(x, y, t) {
+      const nx = x * SCALE, ny = y * SCALE;
+      const s = Math.sin(nx + t * 0.5);
+      const c = Math.cos(ny * (1 + CURL) + t * 0.3);
+      const v = s + c * (1 - CURL) + Math.sin((nx + ny) * 0.5 + t * 0.2);
+      return v * Math.PI; // retorna um ângulo em radianos
+    }
+
+    let last = performance.now();
+
+    function loop(now) {
+      const dt = Math.min(0.033, (now - last) / 1000); // ~30 fps clamp
+      last = now;
+
+      // Leve véu para o rastro (em vez de limpar totalmente)
+      ctx.fillStyle = `rgba(11,15,20,${TRAIL_FADE})`;
+      ctx.fillRect(0, 0, W, H);
+
+      // Desenha partículas
+      for (let i = 0; i < PARTICLES; i++) {
+        const p = particles[i];
+        const ang = flowAngle(p.x, p.y, now * 0.001);
+        // Atualiza velocidade com direção do campo + jitter
+        p.vx += Math.cos(ang) * TURN + (Math.random() - 0.5) * JITTER;
+        p.vy += Math.sin(ang) * TURN + (Math.random() - 0.5) * JITTER;
+
+        // Normaliza a velocidade para manter coesão
+        const vlen = Math.hypot(p.vx, p.vy) || 1;
+        p.vx = (p.vx / vlen) * SPEED * DPR;
+        p.vy = (p.vy / vlen) * SPEED * DPR;
+
+        const x0 = p.x, y0 = p.y;
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life++;
+
+        // Wrap nas bordas para continuidade
+        if (p.x < 0) p.x += W; else if (p.x > W) p.x -= W;
+        if (p.y < 0) p.y += H; else if (p.y > H) p.y -= H;
+
+        // Desenho da trilha
+        ctx.beginPath();
+        ctx.moveTo(x0, y0);
+        ctx.lineTo(p.x, p.y);
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = p.hue + 'cc'; // leve transparência
+        ctx.stroke();
+      }
+
+      if (running) requestAnimationFrame(loop);
+    }
+
+    // Pausar se a aba perde foco (economia de energia)
+    addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        running = false;
+      } else {
+        running = !prefersReducedMotion.matches;
+        last = performance.now();
+        requestAnimationFrame(loop);
+      }
+    });
+
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>
