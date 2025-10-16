@@ -1,101 +1,58 @@
-Aqui está uma página HTML simples e bonita que mostra “cysla” e, logo abaixo, “aguarde”:
-
-```html
 <!doctype html>
 <html lang="pt-br">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>cysla — aguarde</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Aguarde</title>
   <style>
-    :root{
+    :root {
       --bg1: #0f172a; /* slate-900 */
       --bg2: #1e293b; /* slate-800 */
-      --card: rgba(255,255,255,.08);
-      --text: #e5e7eb; /* slate-200 */
-      --muted: #cbd5e1; /* slate-300 */
-      --accent: #38bdf8; /* sky-400 */
-    }
-    @media (prefers-color-scheme: light){
-      :root{
-        --bg1:#eef2ff; /* indigo-50 */
-        --bg2:#e0e7ff; /* indigo-100 */
-        --card: rgba(255,255,255,.7);
-        --text:#0f172a; /* slate-900 */
-        --muted:#334155; /* slate-700 */
-        --accent:#2563eb; /* blue-600 */
-      }
+      --fg:  #e2e8f0; /* slate-200 */
     }
 
-    *{box-sizing:border-box}
-    html,body{
-      height:100%;
-      margin:0;
+    * { box-sizing: border-box; }
+
+    html, body {
+      height: 100%;
+      margin: 0;
       font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI",
-                   Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji",
-                   "Segoe UI Emoji", "Segoe UI Symbol";
-      color:var(--text);
-      background: radial-gradient(1200px 800px at 20% 10%, var(--bg2), var(--bg1));
+                   Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans",
+                   "Apple Color Emoji", "Segoe UI Emoji";
+      background: radial-gradient(1200px 800px at 50% 40%, var(--bg2), var(--bg1));
+      color: var(--fg);
     }
 
-    .wrap{
-      min-height:100%;
-      display:grid;
-      place-items:center;
-      padding:24px;
+    .wrap {
+      min-height: 100%;
+      display: grid;
+      place-items: center;
+      padding: 4rem 1rem;
     }
 
-    .card{
-      width:min(680px, 92vw);
-      padding:48px 36px;
-      text-align:center;
-      border-radius:24px;
-      background: var(--card);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-      box-shadow:
-        0 10px 30px rgba(0,0,0,.15),
-        inset 0 1px 0 rgba(255,255,255,.08);
-      border: 1px solid rgba(255,255,255,.12);
-      transition: transform .3s ease;
-    }
-    .card:hover{ transform: translateY(-2px) }
-
-    .title{
-      margin:0 0 12px;
-      font-size: clamp(40px, 8vw, 72px);
-      font-weight: 800;
-      letter-spacing: .02em;
-      line-height:1.05;
-      text-wrap: balance;
-      background: linear-gradient(90deg, var(--text), var(--accent));
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
+    h1 {
+      margin: 0;
+      font-size: clamp(2rem, 6vw, 4rem);
+      letter-spacing: 0.08em;
+      text-transform: lowercase;
+      text-shadow: 0 2px 12px rgba(0,0,0,.25);
+      animation: pulse 2.2s ease-in-out infinite;
     }
 
-    .subtitle{
-      margin:0;
-      font-size: clamp(18px, 2.6vw, 22px);
-      color: var(--muted);
-      letter-spacing: .03em;
-    }
-
-    /* opcional: leve pulso para dar vida ao card */
     @keyframes pulse {
-      0%,100%{ box-shadow: 0 10px 30px rgba(0,0,0,.15), inset 0 1px 0 rgba(255,255,255,.08) }
-      50%{ box-shadow: 0 14px 40px rgba(0,0,0,.20), inset 0 1px 0 rgba(255,255,255,.10) }
+      0%, 100% { transform: scale(1);    opacity: 0.96; filter: drop-shadow(0 6px 24px rgba(0,0,0,.25)); }
+      50%      { transform: scale(1.03); opacity: 1;    filter: drop-shadow(0 10px 36px rgba(0,0,0,.35)); }
     }
-    .card{ animation: pulse 4s ease-in-out infinite }
+
+    /* Acessibilidade: reduz animações se o usuário preferir menos movimento */
+    @media (prefers-reduced-motion: reduce) {
+      h1 { animation: none; }
+    }
   </style>
 </head>
 <body>
-  <main class="wrap">
-    <section class="card" aria-label="Mensagem de status">
-      <h1 class="title">cysla</h1>
-      <p class="subtitle">aguarde</p>
-    </section>
-  </main>
+  <div class="wrap">
+    <h1>aguarde</h1>
+  </div>
 </body>
 </html>
-```
