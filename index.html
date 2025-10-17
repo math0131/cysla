@@ -5,28 +5,27 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Cysla</title>
 <style>
-  :root { --bg: #0b0f14; --ink:#e8f0ff; }
+  :root { --bg:#0b0f14; --ink:#e8f0ff; }
   html, body { height:100%; margin:0; background:var(--bg); color:var(--ink); overflow:hidden;
     font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
   canvas { position:fixed; inset:0; width:100%; height:100%; display:block; }
-  .center { position:fixed; inset:0; display:grid; place-items:center; pointer-events:none;
-    text-transform: lowercase; letter-spacing:.12em; font-weight:600; padding:2rem; }
-  .center span { font-size:clamp(1.2rem,3vw + 1rem,3rem); opacity:.95; text-shadow:0 2px 8px rgba(232,240,255,.18);
-    animation:pulse 2s ease-in-out infinite; }
-  @keyframes pulse { 0%,100%{ transform:translateY(0); opacity:.95 } 50%{ transform:translateY(-2px); opacity:1 } }
-  @media (prefers-reduced-motion: reduce){ .center span{ animation:none } }
+
+  .center { position:fixed; inset:0; display:grid; place-items:center; pointer-events:none; padding:2rem; }
+  .center img.logo { max-width:min(40vw, 400px); width:100%; height:auto; opacity:.95;
+    filter: drop-shadow(0 2px 8px rgba(232,240,255,.18));
+  }
 </style>
 </head>
 <body>
   <canvas id="gl"></canvas>
-  <div class="center"><span>aguarde</span></div>
+  <!-- Logo atualizado -->
+  <div class="center" aria-hidden="true"><img class="logo" src="cislawhite.png" alt="Cysla" /></div>
 
 <script>
 (function(){
   const canvas = document.getElementById('gl');
   const DPR = Math.max(1, Math.min(2, window.devicePixelRatio||1));
 
-  // WebGL sem alpha para evitar costuras/banding do compositor
   const gl = canvas.getContext('webgl', { alpha:false, antialias:false, depth:false, stencil:false, preserveDrawingBuffer:false });
   if(!gl){ document.body.style.background='#0b0f14'; return; }
 
@@ -52,7 +51,6 @@
     uniform vec2 uRes;
     uniform float uTime;
 
-    // hash & noise (baratos e sem textura externa)
     float hash(vec2 p){ return fract(sin(dot(p, vec2(41.0, 289.0))) * 43758.5453123); }
     float noise(vec2 p){
       vec2 i = floor(p), f = fract(p);
@@ -70,22 +68,19 @@
     }
 
     void main(){
-      // coords estáveis, sem subpixel: base em px inteiros
       vec2 px = floor(vUv * uRes) / uRes;
       vec2 uv = px * vec2(uRes.x/uRes.y, 1.0);
 
-      // campo animado (sem blends)
       float t = uTime*0.07;
       float n1 = fbm(uv*2.0 + vec2(t, -t));
       float n2 = fbm(uv*3.7 + vec2(-t*0.7, t*0.5));
       float n = smoothstep(0.2, 0.8, mix(n1, n2, 0.5));
 
-      // paleta (azul → ciano) – tudo opaco
       vec3 a = vec3(0.06, 0.23, 0.42);
       vec3 b = vec3(0.36, 0.71, 1.00);
       vec3 col = mix(a, b, n);
 
-      gl_FragColor = vec4(col, 1.0); // 100% opaco
+      gl_FragColor = vec4(col, 1.0);
     }`;
 
   function compile(type, src){
@@ -101,7 +96,6 @@
 
   const quad = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, quad);
-  // full-screen quad (2 triângulos) – sem linhas
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
     -1,-1,  1,-1, -1, 1,
      1,-1,  1, 1, -1, 1
@@ -124,7 +118,6 @@
   }
   requestAnimationFrame(frame);
 
-  // pausa em background
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) t0 = performance.now();
   });
